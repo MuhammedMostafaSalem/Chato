@@ -62,6 +62,10 @@ const userSchema = new mongoose.Schema({
             ref: "User",
         },
     ],
+    isVerified: {
+        type: Boolean,
+        default: false,
+    },
     otp: String,
     otpExpires: Date,
     otpResendTimeout: Date,
@@ -70,7 +74,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Hash password before saving the user
-userSchema.pre('save', async function() {
+userSchema.pre('save', async function () {
     // only hash the password if it has been modified (or is new)
     if (!this.isModified('password')) return;
 
@@ -81,11 +85,23 @@ userSchema.pre('save', async function() {
 });
 
 // Method to compare given password with the database hash
-userSchema.methods.comparePassword = function(candidatePassword, cb) {
-    bcrypt.compare(candidatePassword, this.password, function(err, isMatch) {
+userSchema.methods.comparePassword = function (candidatePassword, cb) {
+    bcrypt.compare(candidatePassword, this.password, function (err, isMatch) {
         if (err) return cb(err);
         cb(null, isMatch);
     })
+}
+
+// Method to generate and hash OTP
+userSchema.methods.generateOtp = async function () {
+    const otp = Math.floor(100000 + Math.random() * 900000).toString(); // generate a 6-digit OTP
+
+    const saltRounds = await bcrypt.genSalt(10); // generate a salt
+    this.otp = await bcrypt.hash(otp, saltRounds); // hash the OTP
+    this.otpExpires = Date.now() + 10 * 60 * 1000; // OTP valid for 10 minutes
+    this.otpResendTimeout = Date.now() + 60 * 1000; // Resend allowed after 1 minute
+
+    return otp;
 }
 
 const User = mongoose.model("User", userSchema);
