@@ -1,10 +1,12 @@
 const express = require('express');
-const { register } = require('../controllers/authController');
+const { register, verifyEmailOtp, resendEmailOtp } = require('../controllers/authController');
 
 // Create a new router instance
 const router = express.Router();
 
-// Register route
+// Auth routes
 router.post('/register', register);
+router.post('/verify-otp', verifyEmailOtp);
+router.post('/resend-otp', resendEmailOtp);
 
 module.exports = router;
