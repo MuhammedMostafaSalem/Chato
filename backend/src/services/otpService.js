@@ -2,18 +2,20 @@ const bcrypt = require("bcrypt");
 const User = require("../models/userModels");
 const ErrorHandler = require("../utils/errorHandler");
 const sendEmail = require("../utils/sendEmail");
-const otpTemplate = require("../templates/otpTemplate");
+const verifyEmailTemplate = require("../templates/verifyEmailTemplate");
+const forgotPasswordTemplate = require("../templates/forgotPasswordTemplate");
 
 // Verify OTP
-const verifyOtp = async(otp) => {
+const verifyOtp = async (otp, purpose) => {
     // Find a user whose OTP has not expired yet
     const user = await User.findOne({
+        otpPurpose: purpose,
         otpExpires: { $gt: Date.now() },
     }).select("+otp"); // Explicitly include OTP field
 
     // If no user is found, OTP is invalid or expired
     if (!user) {
-        throw new ErrorHandler("Invalid or expired OTP");
+        throw new ErrorHandler("Invalid or expired OTP", 400);
     }
 
     // Compare the provided OTP with the hashed OTP stored in database
@@ -21,19 +23,24 @@ const verifyOtp = async(otp) => {
 
     // If OTP does not match, throw an error
     if (!isMatch) {
-        throw new ErrorHandler("Invalid OTP");
+        throw new ErrorHandler("Invalid OTP", 400);
     }
 
-    // Prevent verifying an already verified user
-    if (user.isVerified) {
-        throw new ErrorHandler("User already verified");
+    // Email verification
+    if (purpose === "email_verification") {
+        // Prevent verifying an already verified user
+        if (user.isVerified) {
+            throw new ErrorHandler("User already verified", 400);
+        }
+        // Mark user as verified
+        user.isVerified = true;
     }
 
-    // Mark user as verified and clear OTP fields
-    user.isVerified = true;
+    // clear OTP fields
     user.otp = undefined;
     user.otpExpires = undefined;
     user.otpResendTimeout = undefined;
+    user.otpPurpose = undefined;
 
     await user.save();
 
@@ -41,7 +48,7 @@ const verifyOtp = async(otp) => {
 }
 
 // Resend OTP
-const resendOtp = async(phoneNumber) => {
+const resendOtp = async (phoneNumber, purpose) => {
     // Find user by phone number
     const user = await User.findOne({ phoneNumber });
 
@@ -51,9 +58,10 @@ const resendOtp = async(phoneNumber) => {
     }
 
     // If user is already verified, no need to resend OTP
-    if (user.isVerified) {
-        throw new ErrorHandler("User is already verified", 400);
+    if (purpose === "email_verification" && user.isVerified) {
+        throw new ErrorHandler("User already verified", 400);
     }
+
 
     // Prevent OTP spam by checking resend timeout
     if (user.otpResendTimeout && user.otpResendTimeout > Date.now()) {
@@ -65,15 +73,18 @@ const resendOtp = async(phoneNumber) => {
     }
 
     // Generate new OTP and update resend timeout
-    const otp = await user.generateOtp();
+    const otp = await user.generateOtp(purpose);
     await user.save();
 
     // Send OTP via email
     await sendEmail({
         email: user.email,
-        subject: 'Resend OTP - Chato App',
-        message: `Your new OTP is ${otp}. It is valid for 10 minutes.`,
-        html: otpTemplate(user.username, otp),
+        subject: purpose === "forgot_password"
+            ? "Reset Password OTP - Chato App"
+            : "Verify Email OTP - Chato App",
+        html: purpose === "forgot_password"
+            ? forgotPasswordTemplate(user.username, otp)
+            : verifyEmailTemplate(user.username, otp)
     });
 
     return true;
