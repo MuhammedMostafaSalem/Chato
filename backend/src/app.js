@@ -6,6 +6,7 @@ const errorMiddleware = require('./middlewares/errorMiddleware');
 const app = express();
 
 const authRoute = require('./routes/authRoute'); // Import auth routes
+const userRoute = require('./routes/userRoute'); // Import user routes
 
 app.use(express.json());  // Middleware to parse JSON request bodies
 app.use(cookieParser());  // Middleware to cookie parser
@@ -13,6 +14,7 @@ app.use(jsendMiddleware);  // Middleware to add JSend response methods
 
 
 app.use('/api/auth', authRoute);
+app.use('/api/users', userRoute);
 
 app.use(errorMiddleware); // Global error handling middleware
 
