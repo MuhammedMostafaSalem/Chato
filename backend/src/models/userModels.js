@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
+// User Schema Definition
 const userSchema = new mongoose.Schema({
     username: {
         type: String,
@@ -69,6 +71,10 @@ const userSchema = new mongoose.Schema({
     otp: String,
     otpExpires: Date,
     otpResendTimeout: Date,
+    otpPurpose: {
+        type: String,
+        enum: ["email_verification", "forgot_password"],
+    },
 }, {
     timestamps: true // Automatically manage createdAt and updatedAt fields
 });
@@ -85,23 +91,39 @@ userSchema.pre('save', async function () {
 });
 
 // Method to compare given password with the database hash
-userSchema.methods.comparePassword = function (candidatePassword, cb) {
-    bcrypt.compare(candidatePassword, this.password, function (err, isMatch) {
-        if (err) return cb(err);
-        cb(null, isMatch);
-    })
+userSchema.methods.comparePassword = async function (candidatePassword) {
+    return await bcrypt.compare(candidatePassword, this.password);
 }
 
 // Method to generate and hash OTP
-userSchema.methods.generateOtp = async function () {
+userSchema.methods.generateOtp = async function (purpose) {
     const otp = Math.floor(100000 + Math.random() * 900000).toString(); // generate a 6-digit OTP
 
     const saltRounds = await bcrypt.genSalt(10); // generate a salt
     this.otp = await bcrypt.hash(otp, saltRounds); // hash the OTP
     this.otpExpires = Date.now() + 10 * 60 * 1000; // OTP valid for 10 minutes
     this.otpResendTimeout = Date.now() + 60 * 1000; // Resend allowed after 1 minute
+    this.otpPurpose = purpose;
 
     return otp;
+}
+
+// Method to generate JWT token
+userSchema.methods.generateAccessToken = function () {
+    return jwt.sign(
+        { id: this._id },
+        process.env.JWT_ACCESS_SECRET,
+        { expiresIn: process.env.JWT_ACCESS_EXPIRE }
+    );
+}
+
+// method to generate Refresh JWT token
+userSchema.methods.generateRefreshToken = function () {
+    return jwt.sign(
+        { id: this._id },
+        process.env.JWT_REFRESH_SECRET,
+        { expiresIn: process.env.JWT_REFRESH_EXPIRE }
+    )
 }
 
 const User = mongoose.model("User", userSchema);
