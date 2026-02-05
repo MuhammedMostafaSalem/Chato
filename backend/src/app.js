@@ -1,9 +1,12 @@
 const express = require('express');
+const path = require('path');
 const cookieParser = require("cookie-parser");
 const jsendMiddleware = require('./middlewares/jsendMiddleware');
 const errorMiddleware = require('./middlewares/errorMiddleware');
 
 const app = express();
+
+app.use("/upload", express.static(path.join(__dirname, 'upload'))); // Make upload accessible via link
 
 const authRoute = require('./routes/authRoute'); // Import auth routes
 const userRoute = require('./routes/userRoute'); // Import user routes
