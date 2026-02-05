@@ -10,6 +10,14 @@ const userSchema = new mongoose.Schema({
         trim: true,
         minlength: [2, "Username must be at least 2 characters"],
         maxlength: [30, "Username must be at most 30 characters"],
+        set: function (value) {
+            return value
+                .toLowerCase()
+                .split(" ")
+                .filter(Boolean)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(" ");
+        }
     },
     email: {
         type: String,
@@ -45,7 +53,10 @@ const userSchema = new mongoose.Schema({
             message: "Password must be 6-20 characters, contain at least one letter and one number, and may include symbols: _@$!%*#?&-"
         }
     },
-    avatar: String,
+    avatar: {
+        type: String,
+        default: null,
+    },
     bio: String,
     isOnline: {
         type: Boolean,
