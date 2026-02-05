@@ -33,16 +33,16 @@ module.exports = (err, req, res, next) => {
     // JWT error
     if (err.name === "JsonWebTokenError") {
         statusCode = 401;
-        const message = "Invalid token. Please login again.";
-        err = new Errorhandler(message, statusCode);
+        message = "Invalid token. Please login again.";
+        err = new ErrorHandler(message, statusCode);
     }
 
     // JWT EXPIRE error
     if (err.name === "TokenExpiredError") {
         statusCode = 401;
-        const message = "Token expired. Please login again.";
+        message = "Token expired. Please login again.";
 
-        err = new Errorhandler(message, statusCode);
+        err = new ErrorHandler(message, statusCode);
     }
 
     console.log(err);
