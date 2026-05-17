@@ -63,18 +63,6 @@ const userSchema = new mongoose.Schema({
         default: false,
     },
     lastSeen: Date,
-    connect: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-        },
-    ],
-    blockedUsers: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-        },
-    ],
     isVerified: {
         type: Boolean,
         default: false,
