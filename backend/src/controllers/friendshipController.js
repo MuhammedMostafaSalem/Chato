@@ -18,15 +18,16 @@ const ErrorHandler = require("../utils/errorHandler");
 const getSuggestions = asyncWrapper(async (req, res, next) => {
     // Get the logged-in user's ID from the request object (set by auth middleware)
     const userId = req.user.id;
+    const queryString = req.query;
 
     // Call the service to get friend suggestions for the user
-    const suggestions = await getSuggestedService(userId);
+    const suggestions = await getSuggestedService(userId, queryString);
 
     // If no suggestions found, return a message instead of an empty array
-    if (suggestions.length === 0) {
+    if (suggestions.suggestedUsers.length === 0) {
         return res.success("No friend suggestions found", 200);
     } else {
-        res.success(suggestions);
+        res.success(suggestions, 200);
     }
 });
 
@@ -34,18 +35,16 @@ const getSuggestions = asyncWrapper(async (req, res, next) => {
 const getRequests = asyncWrapper(async (req, res, next) => {
     // Get the logged-in user's ID from the request object (set by auth middleware)
     const userId = req.user.id;
+    const queryString = req.query;
 
     // Call the service to get friend requests for the user
-    const requests = await getRequestsService(userId, "incoming");
+    const requests = await getRequestsService(userId, "incoming", queryString);
 
     // If no requests found, return a message instead of an empty array
-    if (requests.length === 0) {
+    if (requests.requests.length === 0) {
         return res.success("No friend requests found", 200);
     } else {
-        res.success({
-            requests,
-            count: requests.length
-        });
+        res.success(requests, 200);
     }
 });
 
@@ -53,20 +52,18 @@ const getRequests = asyncWrapper(async (req, res, next) => {
 const getSentRequests = asyncWrapper(async (req, res, next) => {
     // Get the logged-in user's ID from the request object (set by auth middleware)
     const userId = req.user.id;
+    const queryString = req.query;
 
     // const sentRequests = await getSentRequestsService(userId);
 
     // Call the service to get sent friend requests for the user
-    const sentRequests = await getRequestsService(userId, "sent");
+    const sentRequests = await getRequestsService(userId, "sent", queryString);
 
     // If no sent requests found, return a message instead of an empty array
-    if (sentRequests.length === 0) {
+    if (sentRequests.requests.length === 0) {
         return res.success("No sent friend requests found", 200);
     } else {
-        res.success({
-            requests: sentRequests,
-            count: sentRequests.length
-        });
+        res.success(sentRequests, 200);
     }
 });
 
@@ -142,18 +139,16 @@ const rejectRequest = asyncWrapper(async (req, res, next) => {
 // getFriends logic will go here
 const getFriends = asyncWrapper(async (req, res, next) => {
     const userId = req.user.id;
+    const queryString = req.query;
 
     // Call the service to get the list of friends for the user
-    const friends = await getFriendsService(userId);
+    const friends = await getFriendsService(userId, queryString);
 
     // If no friends found, return a message instead of an empty array
-    if (friends.length === 0) {
+    if (friends.friends.length === 0) {
         return res.success("No friends found", 200);
     } else {
-        res.success({
-            count: friends.length,
-            friends
-        });
+        res.success(friends, 200);
     }
 });
 
@@ -211,19 +206,16 @@ const unblockUser = asyncWrapper(async (req, res, next) => {
 // getBlockedList logic will go here
 const getBlockedList = asyncWrapper(async (req, res, next) => {
     const currentUserId = req.user.id;
+    const queryString = req.query;
 
     // Call the service to get the list of blocked users for the current user
-    const blockedList = await getBlockedListService(currentUserId);
+    const blockedList = await getBlockedListService(currentUserId, queryString);
 
     // Send success response
-    if (blockedList.length === 0) {
+    if (blockedList.blockedUsers.length === 0) {
         return res.success("No blocked users found", 200);
     } else {
-        res.success({
-            count: blockedList.length,
-            message: "Blocked users retrieved successfully",
-            blockedList
-        }, 200);
+        res.success(blockedList, 200);
     }
 });
 
