@@ -75,7 +75,7 @@ const getRequestsService = async (userId, type, queryString) => {
     const populateField = type === "incoming" ? "requester" : "recipient";
 
     // Execute the query to find friend requests and populate the relevant user information
-    let query = await Friendship.find(filter)
+    let query = Friendship.find(filter)
         .populate(populateField, "username phoneNumber email avatar")
         .sort({ createdAt: -1 });
 
@@ -326,44 +326,39 @@ const handleRequestActionService = async (currentUserId, targetUserId, action) =
 }
 
 // Service to get friends list for a user
-const getFriendsService = async (userId, queryString) => {
-    const filter = {
-        $or: [
-            { requester: userId },
-            { recipient: userId },
-        ],
-        status: "accepted",
-    }
-    // Find all accepted friendships involving the user
-    let query = Friendship.find(filter)
-        .populate("requester recipient", "username phoneNumber email avatar")
-        .sort({ createdAt: -1 });
-
-    const apiFeatures = new ApiFeatures(query, queryString).search();
-
-    const totalDocs = await Friendship.countDocuments(filter);
-
-    apiFeatures.paginate(totalDocs);
-
-    const friendships = await apiFeatures.query;
-    const currentResults = friendships.length;
-    const paginationResult = apiFeatures.paginationResult;
-
-    // Map the friendships to return the friend user information
-    const friends = friendships.map(friendship => {
-        if (friendship.requester._id.toString() === userId.toString()) {
-            return friendship.recipient;
+    const getFriendsService = async (userId, queryString) => {
+        // 1. Find your friends' IDs
+        let filter = {
+            $or: [{ requester: userId }, { recipient: userId }],
+            status: "accepted"
         }
-        return friendship.requester;
-    });
 
-    return {
-        totalDocs,
-        currentResults,
-        friends,
-        paginationResult
-    };
-}
+        const friendships = await Friendship.find(filter);
+
+        const friendIds = friendships.map(friendship =>
+            friendship.requester.toString() === userId.toString() ? friendship.recipient : friendship.requester
+        );
+
+        // 2. Build a query on User
+        let query = User.find({ _id: { $in: friendIds } }).select("username phoneNumber email avatar");
+
+        // 3. Use ApiFeatures
+        const apiFeatures = new ApiFeatures(query, queryString).search();
+        const totalDocs = await User.countDocuments({ _id: { $in: friendIds } });
+        apiFeatures.paginate(totalDocs);
+
+        // 4. Execute query
+        const friends = await apiFeatures.query;
+        const paginationResult = apiFeatures.paginationResult;
+        const currentResults = friends.length;
+        
+        return {
+            totalDocs,
+            currentResults,
+            friends,
+            paginationResult
+        };
+    }
 
 // Service to remove a friend
 const removeFriendService = async (currentUserId, targetUserId) => {
