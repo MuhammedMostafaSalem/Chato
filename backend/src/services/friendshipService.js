@@ -1,11 +1,12 @@
 const Friendship = require("../models/friendshipModel");
 const User = require("../models/userModels");
+const ApiFeatures = require("../utils/apiFeatures");
 const ErrorHandler = require("../utils/errorHandler");
 
 
 
 // Service to get friend suggestions for a user
-const getSuggestedService = async (currentUserId) => {
+const getSuggestedService = async (currentUserId, queryString) => {
     // Find all friendships involving the current user
     const friendships = await Friendship.find({
         $or: [
@@ -29,16 +30,32 @@ const getSuggestedService = async (currentUserId) => {
     // also exclude the current user themselves
     excludedUserIds.add(currentUserId);
 
-    // Find users who are not in the excluded set and return them as suggestions
-    const suggestedUsers = await User.find({
-        _id: { $nin: Array.from(excludedUserIds) },
-    }).select("username phoneNumber email avatar");
+    let filter = { _id: { $nin: Array.from(excludedUserIds) } }
 
-    return suggestedUsers;
+    let query = User.find(filter).select("username phoneNumber email avatar");
+
+    const apiFeatures = new ApiFeatures(query, queryString).search();
+
+    const totalDocs = await User.countDocuments(apiFeatures.query);
+
+    apiFeatures.paginate(totalDocs);
+
+
+    // Find users who are not in the excluded set and return them as suggestions
+    const suggestedUsers = await apiFeatures.query;
+    const currentResults = suggestedUsers.length;
+    const paginationResult = await apiFeatures.paginationResult;
+
+    return {
+        totalDocs,
+        currentResults,
+        suggestedUsers,
+        paginationResult
+    };
 }
 
 // Service to get friend requests for a user (both incoming and sent)
-const getRequestsService = async (userId, type) => {
+const getRequestsService = async (userId, type, queryString) => {
     // Build the query filter based on the request type (incoming or sent)
     const filter = {
         status: "pending",
@@ -58,11 +75,26 @@ const getRequestsService = async (userId, type) => {
     const populateField = type === "incoming" ? "requester" : "recipient";
 
     // Execute the query to find friend requests and populate the relevant user information
-    const requests = await Friendship.find(filter)
+    let query = await Friendship.find(filter)
         .populate(populateField, "username phoneNumber email avatar")
         .sort({ createdAt: -1 });
 
-    return requests;
+    const apiFeatures = new ApiFeatures(query, queryString).search();
+
+    const totalDocs = await Friendship.countDocuments(filter);
+
+    apiFeatures.paginate(totalDocs);
+
+    const requests = await apiFeatures.query;
+    const currentResults = requests.length;
+    const paginationResult = apiFeatures.paginationResult;
+
+    return {
+        totalDocs,
+        currentResults,
+        requests,
+        paginationResult
+    };
 }
 
 // Service to send a friend request
@@ -159,7 +191,7 @@ const acceptRequestService = async (currentUserId, targetUserId) => {
     }
 
     // Check if either user has blocked the other
-    if(friendship.isBlocked) {
+    if (friendship.isBlocked) {
         throw new ErrorHandler("Action not allowed (blocked)", 403);
     }
 
@@ -265,7 +297,7 @@ const handleRequestActionService = async (currentUserId, targetUserId, action) =
     }
 
     // Check if either user has blocked the other
-    if(friendship.isBlocked) {
+    if (friendship.isBlocked) {
         throw new ErrorHandler("Action not allowed (blocked)", 403);
     }
 
@@ -294,17 +326,28 @@ const handleRequestActionService = async (currentUserId, targetUserId, action) =
 }
 
 // Service to get friends list for a user
-const getFriendsService = async (userId) => {
-    // Find all accepted friendships involving the user
-    const friendships = await Friendship.find({
+const getFriendsService = async (userId, queryString) => {
+    const filter = {
         $or: [
             { requester: userId },
             { recipient: userId },
         ],
         status: "accepted",
-    })
+    }
+    // Find all accepted friendships involving the user
+    let query = Friendship.find(filter)
         .populate("requester recipient", "username phoneNumber email avatar")
         .sort({ createdAt: -1 });
+
+    const apiFeatures = new ApiFeatures(query, queryString).search();
+
+    const totalDocs = await Friendship.countDocuments(filter);
+
+    apiFeatures.paginate(totalDocs);
+
+    const friendships = await apiFeatures.query;
+    const currentResults = friendships.length;
+    const paginationResult = apiFeatures.paginationResult;
 
     // Map the friendships to return the friend user information
     const friends = friendships.map(friendship => {
@@ -314,7 +357,12 @@ const getFriendsService = async (userId) => {
         return friendship.requester;
     });
 
-    return friends;
+    return {
+        totalDocs,
+        currentResults,
+        friends,
+        paginationResult
+    };
 }
 
 // Service to remove a friend
@@ -481,14 +529,26 @@ const unblockUserService = async (currentUserId, targetUserId) => {
 }
 
 // Service to get the list of blocked users for a user
-const getBlockedListService = async (currentUserId) => {
-    // Find all blocked relationships involving the user
-    const blockedFriendships = await Friendship.find({
+const getBlockedListService = async (currentUserId, queryString) => {
+    let filter = {
         isBlocked: true,
         blockedBy: currentUserId
-    })
+    }
+
+    // Find all blocked relationships involving the user
+    let query = Friendship.find(filter)
         .populate("requester recipient", "username phoneNumber email avatar")
         .sort({ createdAt: -1 });
+
+    const apiFeatures = new ApiFeatures(query, queryString).search();
+
+    const totalDocs = await Friendship.countDocuments(filter);
+
+    apiFeatures.paginate(totalDocs);
+
+    const blockedFriendships = await apiFeatures.query;
+    const currentResults = blockedFriendships.length;
+    const paginationResult = apiFeatures.paginationResult;
 
     // Map the relationships to return the blocked user information
     const blockedUsers = blockedFriendships.map(friendship => {
@@ -498,7 +558,12 @@ const getBlockedListService = async (currentUserId) => {
         return friendship.requester;
     });
 
-    return blockedUsers;
+    return {
+        totalDocs,
+        currentResults,
+        blockedUsers,
+        paginationResult
+    };
 }
 
 
